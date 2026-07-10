@@ -1,0 +1,5 @@
+- MAD function (median absolute deviation): smoothing out maybe to see if the curve makes it easier to detect
+- duration 1 sec or less - code should handle full duration, but a snippet is enough 
+- do we need to filter data - no need to filter data. 
+- positive/negative spike - define based on the threshold, add a function to check if threshold is negative positive) 
+- double check the voltage unit (say we assume its in millivolts)
