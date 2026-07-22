@@ -5,8 +5,6 @@ This project implements a simple spike detection algorithm for intracellular neu
 
 The algorithm detects spikes by identifying the first time the signal crosses a threshold. A separate threshold is calculated for each recording channel using the Median Absolute Deviation (MAD). The detected spike locations are returned as timestamps in milliseconds.
 
-The project was implemented using basic Python programming concepts, including loops, conditionals, lists, dictionaries, and NumPy.
-
 ---
 
 ## Project Files
