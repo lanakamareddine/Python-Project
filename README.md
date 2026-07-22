@@ -68,4 +68,5 @@ Some limitations include:
 ## Authors
 
 **Zhenni Jin, Subin Lee, Lana Kamareddine**
+SoSe 2026 - Python: Basic Programming Module
  
