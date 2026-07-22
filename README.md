@@ -23,12 +23,6 @@ The project requires the following Python packages:
 - SciPy
 - Matplotlib
 
-Install them using:
-
-```bash
-pip install numpy scipy matplotlib
-```
-
 ---
 
 ## Algorithm
