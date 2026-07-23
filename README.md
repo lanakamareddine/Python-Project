@@ -32,16 +32,17 @@ Note: Use Loadmat to convert the raw data from .mat files in order to be visuali
 
 The spike detector performs the following steps:
 
-1. Load the intracellular recording.
-2. Convert the sample index into a timestamp (milliseconds).
-3. Calculate one threshold for each channel using the Median Absolute Deviation (MAD).
-4. Estimate the noise level by dividing the MAD by 0.6745.
-5. Loop through every sample in each channel.
-6. Detect the first threshold crossing:
-   - upward crossing for positive thresholds
-   - downward crossing for negative thresholds
-7. Store the spike timestamps for each channel.
-8. Return the detected spike timestamps.
+1. Import the raw data from the MATLAB file.
+2. Plot the raw recordings to visualize the signal from each channel.
+3. Calculate a separate detection threshold for each recording channel using the Median Absolute Deviation (MAD).
+4. Estimate the background noise by dividing the MAD by 0.6745.
+5. Calculate both positive and negative thresholds using the estimated noise level.
+6. Select the threshold (positive or negative) with the greater number of crossings for each channel.
+7. Loop through every sample in each recording channel.
+8. Detect the first threshold crossing by comparing each sample with the previous sample.
+9. Convert the detected sample indices into timestamps in milliseconds.
+10. Store the spike timestamps for each channel in a dictionary.
+11. Return the spike timestamps and the thresholds used for detection.
 
 ## Functions
 
