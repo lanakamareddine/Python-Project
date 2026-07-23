@@ -1,0 +1,62 @@
+PART1: Import Data & Define Data
+- scipy.io is a toolbox for reading/writing files in other formats. We import its loadmat function so Python can open .mat files.
+- loadmat reads the rawdata file and stored into a variable called data. Because a .mat file can contain several named variables, loadmat gives them back to us as a Python dictionary, where each variable's original name becomes a "key" we can look up.
+- our file contains two variables: 'd' (the raw recording) and 'si' (the sampling interval, i.e. the time between two consecutive samples). We pull each one out of the dictionary: data['d'] becomes our d, and data['si'] becomes our si.
+- si comes out of the .mat file wrapped inside a tiny 1x1 matrix, e.g. [[99]], instead of a plain number. Calling .item() on it "unwraps" that matrix and gives us the plain number 99 by itself, which is what we actually want to do arithmetic with later.
+- printing d.shape and si is just a sanity check to confirm the data loaded correctly. In our data, d.shape is (1,010,101, 2): 1,010,101 rows (one row per time sample) and 2 columns (one per recording channel). si is 99, meaning each sample is taken 99 microseconds apart.
+
+PART2: To Visualize the Raw Data
+- numpy gives us fast array/matrix math, and matplotlib.pyplot is the plotting library we use to draw the figures. We import both so we can build a time axis and plot the signal.
+- si is in microseconds, so we convert it to milliseconds (si_ms = si / 1000) since milliseconds are an easier unit to read on a plot and to work with later.
+- to plot against real time instead of just a sample index, we build a time axis: d.shape[0] is the total number of samples (1,010,101, one million ten thousand one hundred and one), so np.arange(d.shape[0]) creates the list of sample indices 0, 1, 2, ..., 1,010,100. Multiplying that list by si_ms converts each index into an actual timestamp in milliseconds, giving us the time array.
+- plt.subplots(2, 1, figsize=(12, 6), sharex=True) creates one figure with 2 rows (one per channel) and one column: axes[0] is the top plot, axes[1] is the bottom plot. figsize sets the overall size of the figure (12 wide by 6 tall, in inches). sharex=True ensure both subplots share the same time axis, so the same instant in time lines up vertically between the two channels - useful for comparing them.
+- we mask the time to the first 2 seconds which is the less than 2000 ms here so that the plot only shows this shorter window instead of entire around 101 second recording which would otherwise be too dense to read. mask = time < 2000 creates a boolean True/False array: True wherever the time is less than 2000 ms.  This window is easy to change - e.g. mask = time < 500 would instead show just the first half-second.
+- fig.suptitle(...) adds one title above both subplots together.
+- axes[0].plot(...) draws channel 1's signal (column 0 of d) on the top subplot, in black, using only the masked (first 2 seconds) time window. axes[0].set_ylabel(...) labels that subplot's y-axis.
+- the same is done for channel 2 (column 1 of d) on the bottom subplot, axes[1].
+- since the two subplots share an x-axis, we only need to label the time axis once, on the bottom plot.
+- plt.tight_layout() automatically adjusts the spacing between subplots/labels so nothing overlaps, and plt.show() displays the finished figure.
+
+PART3: Threshold Calculation
+- a "spike" in this kind of recording is a moment where the voltage jumps above or below its baseline. To detect spikes automatically we first need a threshold: a cut-off value that separates "normal noise" from "this is probably a real spike".
+- auto_threshold(x, k=4) is a function we define to work this threshold out automatically for one channel's signal (x), rather than us having to guess a number by eye. k controls how far above/below the baseline (measured in "noise units") a point has to be before we call it a spike; we use k=4 here.
+- median = np.median(x) finds the middle value of the signal. We use the median rather than the mean/average, because spikes could be large outliers that would pull an average away from the true resting baseline, whereas the median stays close to that baseline even with spikes present.
+- distance_from_median = np.abs(x - median) measures how far every single sample is from that median (always a non-negative number, thanks to np.abs), which tells us how noisy/spread out the signal generally is.
+- mad = np.median(distance_from_median) is the Median Absolute Deviation: taking the median of those distances gives a robust estimate of the "typical" noise level that also is not thrown off by the spikes themselves.
+- noise = mad / 0.6745 rescales the MAD into an estimate that is comparable to a normal standard deviation (assuming the background noise is roughly bell-curve/normally distributed). 0.6745 is a standard statistical constant 
+- pos_thr = median + k * noise is the threshold to use if spikes go upward (positive-going): a point has to be at least k noise-units above the baseline. neg_thr = median - k * noise is the equivalent threshold for spikes that go downward (negative-going).
+- n_pos_thr and n_neg_thr count how many data points actually cross each threshold, using np.sum() on a comparison such as x > pos_thr. Comparing an array to a number produces an array of True/False values, and summing True/False values counts how many are True.
+- whichever threshold catches more crossings tells us which direction the real spikes go in this channel, so that one is returned as the final threshold. This is why the function is called "auto" threshold: it automatically works out both the right cut-off value and the correct direction, rather than us choosing it manually.
+- for our data with k=4, both channels turned out to have negative-going spikes: channel 1's threshold came out at about -0.074 mV, and channel 2's at about -0.109 mV.
+
+PART4: Threshold Detection
+- now that we have a function that can find the correct threshold for one channel, we build a bigger function called spike_detect that uses it to actually find every spike in the data, for every channel, and record the exact time each spike happened which is later on the time stamp generator.
+- the function spike_detet takes in d (the raw data), si (the sampling interval) and k (same meaning as before, how many noise units count as a spike). 
+- si_ms = si/1000 converts the sampling interval to milliseconds again (same idea as PART2), because we want our spike times in milliseconds.
+- n_samples = d.shape[0] is the total number of time points in the recording. n_channels = d.shape[1] is how many channels we have (2, in our data).
+- first, the function loops through every channel (for ch in range(n_channels)), pulls out that channel's column of data d[: (give me all rows), 0 or 1], and calls our auto_threshold function on it. Each threshold gets added to a list called thresholds, so thresholds[0] is channel 1's threshold, thresholds[1] is channel 2's threshold, and so on. We print them out just so we can see the numbers.
+- tsl stands for "time-stamp list". It is a Python dictionary - a container that stores information under labelled "keys" - here the key is the channel number, and what's stored under it will be an array of spike times for that channel.
+- then, for every channel, we walk through the samples one at a time using a for loop (for i in range(1, n_samples)). We start counting from sample 1 (not 0) because at every step we need to look at both the current sample and the one right before it, so sample 0 can't be a starting point by itself.
+- previous_value and current_value just grab the signal's value at the sample right before, and at the current sample.
+- just_crossed checks whether the signal has just crossed over the threshold between those two samples. If the threshold is a positive number (thr >= 0), we are looking for the signal moving from below the threshold up to at/above it. If the threshold is negative, we are looking for the opposite: the signal moving from above the threshold down to at/below it. This is exactly how we catch the single moment a spike happens, instead of counting the same spike many times while the signal stays above/below threshold.
+- whenever just_crossed is True, we calculate that moment's real time (spike_time = i * si_ms, same conversion idea as before) and add it to our list spike_times for this channel.
+- once we've gone through the whole recording for this channel, we save its finished list of spike times into tsl (as a NumPy array, for easier use later) and print out how many spikes were found.
+- finally, the function gives back (returns) both tsl (every channel's spike times) and thresholds (the threshold used for each channel), so we can use both of these later for plotting and analysis.
+
+PART5: Plots for Spike Detection
+- first we actually run the spike_detect function on our real data (d, si, k=4) and save its two outputs into tsl and thresholds.
+- we build a new figure the same way as PART2: 2 rows, 1 column, sharing the x-axis, so channel 1 is on top and channel 2 is on the bottom, and both plots line up in time.
+- this time, instead of looking at the first 2 seconds, we zoom into a shorter window: mask keeps only the time points between 500 ms and 1000 ms, so we can clearly see individual spikes and thresholds without the plot looking too crowded.
+- we give the figure a title with suptitle, same idea as before.
+- then we loop through both channels (for ch in range(2)) and, for each one: 1) plot the raw signal in black for the zoomed-in window, 2) draw a red dashed horizontal line at the channel's threshold value using axhline, so we can see exactly where the cut-off is, 3) filter tsl[ch] (that channel's full list of spike times) down to only the spikes that happened between 500 and 1000 ms, calling this times_in_range, and 4) plot each of those spike times as a green dot ('go') sitting right on the threshold line, so we can visually confirm the detector is firing exactly where the signal crosses the threshold.
+- axes[ch].set_ylabel(...) labels each subplot with its channel number.
+- axes[-1] refers to the last subplot in the list (the bottom one); we only label the x-axis once there, since the x-axis is shared.
+- tight_layout() and show() work the same way as in PART2, to clean up spacing and display the final figure.
+
+PART6: Time Stamp Generator
+- this last part is just for double-checking our results in plain text, without needing a plot.
+- tsl.items() lets us loop through the dictionary one channel at a time, giving us both the channel number (ch) and that channel's array of spike times (times) together.
+- for each channel we print a small header showing which channel we're looking at.
+- then we loop through only the first 10 spike times (times[:10]) and print each one, formatted to 1 decimal place (:.1f), so we get a quick readable preview instead of possibly thousands of numbers flooding the screen.
+- finally we print how many spikes were found for that channel in total (len(times) = length of an object), so even though we only see the first 10 values, we still know the true total count.
+
