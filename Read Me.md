@@ -8,7 +8,7 @@ Using the functions below, we are able to generate timestamps for spikes (in mil
 # Files:
 - rawdata01.mat – raw data of channel recordings
 - READ Me.Final Version - Project Read Me file
-- kk
+- FinalVersion - Code File using BW Jupyter
 
 # Packages:
 - Numpy
